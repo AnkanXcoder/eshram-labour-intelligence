@@ -7,15 +7,20 @@ load_dotenv()
 
 API_KEY = os.getenv("ESHRAM_API_KEY")
 
-URL = "https://api.data.gov.in/resource/14d41c5a-feea-423b-be4f-c3636fdd1d82"
+URL = "https://api.data.gov.in/resource/1d4d1c5a-feea-423b-be4f-c3636fdd1d82"
 
 
-def fetch_data(limit=10, offset=0):
+def fetch_data(limit=10, offset=0, retries=3):
+
+    if not API_KEY:
+        raise ValueError("ESHRAM_API_KEY not found in .env")
+
     params = {
         "api-key": API_KEY,
         "format": "json",
         "limit": limit,
-        "offset": offset
+        "offset": offset,
+        
     }
 
     headers = {
@@ -23,14 +28,28 @@ def fetch_data(limit=10, offset=0):
         "Accept": "application/json"
     }
 
-    response = requests.get(
-        URL,
-        params=params,
-        headers=headers,
-        timeout=30
-    )
+    for attempt in range(retries):
 
-    response.raise_for_status()
+        try:
+            response = requests.get(
+                URL,
+                params=params,
+                headers=headers,
+                timeout=30
+            )
+
+            response.raise_for_status()
+            break
+
+        except requests.RequestException as error:
+
+            print(
+                f"Request failed "
+                f"(attempt {attempt + 1}/{retries}): {error}"
+            )
+
+            if attempt == retries - 1:
+                raise
 
     data = response.json()
 
@@ -38,8 +57,10 @@ def fetch_data(limit=10, offset=0):
         print("API returned an error:")
         print(data.get("message"))
         return None
-
+    return data.get("records", [])
     return data
+
+
 
 
 if __name__ == "__main__":
@@ -47,4 +68,6 @@ if __name__ == "__main__":
 
     if data:
         print("API request successful.")
-        print("Records received:", len(data.get("records", [])))
+        print("Records received:", len(data))
+
+  
